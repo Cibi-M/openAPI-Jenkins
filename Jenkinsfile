@@ -9,11 +9,11 @@ pipeline {
     stages {
         stage('Setup Environment') {
             steps {
-                echo 'Installing required system packages...'
+                echo 'Installing required system packages (without sudo)...'
                 sh '''
                     set -e
-                    sudo apt-get update -y
-                    sudo apt-get install -y python${PYTHON_VERSION} python${PYTHON_VERSION}-venv python3-pip
+                    apt-get update -y
+                    apt-get install -y python${PYTHON_VERSION} python${PYTHON_VERSION}-venv python3-pip
                 '''
             }
         }
@@ -32,7 +32,7 @@ pipeline {
 
         stage('Install Requirements') {
             steps {
-                echo 'Installing Python dependencies...'
+                echo 'Installing dependencies...'
                 sh '''
                     . ${VENV_DIR}/bin/activate
                     pip install -r requirements.txt
@@ -42,7 +42,7 @@ pipeline {
 
         stage('Run Tests') {
             steps {
-                echo 'Running tests using pytest...'
+                echo 'Running pytest...'
                 sh '''
                     . ${VENV_DIR}/bin/activate
                     pytest --maxfail=1 --disable-warnings -q
@@ -52,9 +52,8 @@ pipeline {
 
         stage('Cleanup') {
             steps {
-                echo 'Cleaning up workspace...'
+                echo 'Cleaning up virtual environment...'
                 sh '''
-                    deactivate || true
                     rm -rf ${VENV_DIR}
                 '''
             }
@@ -63,13 +62,13 @@ pipeline {
 
     post {
         always {
-            echo 'Build completed. Cleaning up temporary files.'
+            echo 'Build completed.'
         }
         failure {
-            echo 'Build failed. Please check logs above for errors.'
+            echo 'Build failed.'
         }
         success {
-            echo 'Build succeeded!'
+            echo 'Build succeeded.'
         }
     }
 }
