@@ -2,72 +2,74 @@ pipeline {
     agent any
 
     environment {
-        PYTHONUNBUFFERED = '1'  // ensures real-time log output
+        PYTHON_VERSION = '3.13'
+        VENV_DIR = 'venv'
     }
 
     stages {
-
-        stage('Preparation') {
+        stage('Setup Environment') {
             steps {
-                echo '📦 Checking workspace and Python environment...'
+                echo 'Installing required system packages...'
                 sh '''
-                    echo "Current working directory:"
-                    pwd
-                    echo "Listing files in workspace:"
-                    ls -la
-
-                    echo "Checking Python versions:"
-                    python3 --version || echo "Python3 not found!"
-                    pip3 --version || echo "pip3 not found!"
+                    set -e
+                    sudo apt-get update -y
+                    sudo apt-get install -y python${PYTHON_VERSION} python${PYTHON_VERSION}-venv python3-pip
                 '''
             }
         }
 
         stage('Create Virtual Environment') {
             steps {
-                echo '🐍 Creating Python virtual environment...'
+                echo 'Creating Python virtual environment...'
                 sh '''
-                    # Remove any existing venv
-                    rm -rf venv
-                    
-                    # Create and activate virtual environment
-                    python3 -m venv venv
-
-                    # Upgrade pip safely inside venv
-                    . venv/bin/activate
-                    pip install --upgrade pip
+                    python3 -m venv ${VENV_DIR}
+                    . ${VENV_DIR}/bin/activate
+                    python --version
+                    pip install --upgrade pip setuptools wheel
                 '''
             }
         }
 
-        stage('Install Dependencies') {
+        stage('Install Requirements') {
             steps {
-                echo '📥 Installing Python dependencies...'
+                echo 'Installing Python dependencies...'
                 sh '''
-                    . venv/bin/activate
-                    pip install jsonschema requests
+                    . ${VENV_DIR}/bin/activate
+                    pip install -r requirements.txt
                 '''
             }
         }
 
-        stage('Validate OpenAPI Spec') {
+        stage('Run Tests') {
             steps {
-                echo '🔍 Running OpenAPI validation script...'
+                echo 'Running tests using pytest...'
                 sh '''
-                    . venv/bin/activate
-                    ls -la  # show that the JSON and scripts exist
-                    python validate_with_readme.py openapi_snapshot.json openapi_expected.json
+                    . ${VENV_DIR}/bin/activate
+                    pytest --maxfail=1 --disable-warnings -q
+                '''
+            }
+        }
+
+        stage('Cleanup') {
+            steps {
+                echo 'Cleaning up workspace...'
+                sh '''
+                    deactivate || true
+                    rm -rf ${VENV_DIR}
                 '''
             }
         }
     }
 
     post {
-        success {
-            echo '✅ Validation pipeline completed successfully.'
+        always {
+            echo 'Build completed. Cleaning up temporary files.'
         }
         failure {
-            echo '❌ Validation pipeline failed. Check Jenkins logs for details.'
+            echo 'Build failed. Please check logs above for errors.'
+        }
+        success {
+            echo 'Build succeeded!'
         }
     }
 }
